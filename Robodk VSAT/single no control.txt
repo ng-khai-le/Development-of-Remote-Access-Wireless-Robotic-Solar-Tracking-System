@@ -1,0 +1,75 @@
+import time
+import datetime
+from openpyxl import *
+import serial
+port = 'COM11'
+board = serial.Serial(port, 9600, timeout=10)
+
+from robolink import *    # API to communicate with RoboDK
+from robodk import *      # robodk robotics toolbox
+# Any interaction with RoboDK must be done through RDK:
+RDK = Robolink()
+
+# get the robot by name:
+robot = RDK.Item('', ITEM_TYPE_ROBOT)
+
+
+def retrieveData():
+    board.write(b'r')
+    while board.inWaiting():
+        pass
+    data = board.readline().decode('ascii')
+    return data
+
+board.write(b'0')  # send 0 to arduino to reset angle to 90
+time.sleep(1.1)
+
+buffer_pos_vertical = 0
+robot.setJoints([0,0,0,buffer_pos_vertical,0,0])      # set the robot movement's axes angle
+row = 2
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Data"
+ws.append(['Time', 'Date', 'ini_pos_v', 'Fin_LDR1', 'Fin_LDR3', 'Vo_Single(V)',
+           'Vo_fixed(V)', 'Vin_Single(V)', 'Vin_fixed(V)', 'C_Single(mA)', 'C_fixed(mA)', 'P_Single(mW)',
+           'P_fixed(mW)'])
+
+while True:
+    # joints = robot.Joints().list() 
+    data = retrieveData().strip('\r\n').split(',')
+    print(data)
+    #####################################################
+    pos_vertical = int(data[0])
+    robot_angle = pos_vertical - 90 #define new robot angle in robodk
+    robot.setJoints([0,0,0,robot_angle,0,0])      # set the robot movement's axes angle
+    light1 = int(data[1])
+    light3 = int(data[2])
+    real_Vo_Single = (float(data[3]))/1023 * 5
+    real_Vo_Fixed = (float(data[4]))/1023 * 5
+    C_Single = real_Vo_Single / 12250
+    C_Fixed = real_Vo_Fixed / 12250
+    Vin_Single = (C_Single * 22750) + real_Vo_Single
+    Vin_Fixed = (C_Fixed * 22750) + real_Vo_Fixed
+    P_Single = (pow(Vin_Single, 2)) / 35000
+    P_Fixed = (pow(Vin_Fixed, 2)) / 35000
+    ######################################################
+    now = datetime.datetime.now()
+    ws["A" + str(row)].value = now.strftime("%H:%M:%S")
+    ws["B" + str(row)].value = now.strftime("%d/%m/%y")
+    ws["C" + str(row)].value = pos_vertical
+    ws["D" + str(row)].value = light1
+    ws["E" + str(row)].value = light3
+    ws["F" + str(row)].value = real_Vo_Single
+    ws["G" + str(row)].value = real_Vo_Fixed
+    ws["H" + str(row)].value = Vin_Single
+    ws["I" + str(row)].value = Vin_Fixed
+    ws["J" + str(row)].value = C_Single*1000
+    ws["K" + str(row)].value = C_Fixed*1000
+    ws["L" + str(row)].value = P_Single*1000
+    ws["M" + str(row)].value = P_Fixed*1000
+    wb.save(r"C:\Users\nkhai\Desktop\single_pyserial_Excel_NoControl(1).xlsx")
+    ###########################################################
+    row += 1
+    time.sleep(1.1)
+    # time.sleep(1200)
