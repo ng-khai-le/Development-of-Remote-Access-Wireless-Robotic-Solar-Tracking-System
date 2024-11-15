@@ -1,0 +1,42 @@
+# Type help("robodk.robolink") or help("robodk.robomath") for more information
+# Press F5 to run the script
+# Documentation: https://robodk.com/doc/en/RoboDK-API.html
+# Reference:     https://robodk.com/doc/en/PythonAPI/robodk.html
+# Note: It is not required to keep a copy of this file, your Python script is saved with your RDK project
+
+import math
+pi = 3.14159265359
+# You can also use the new version of the API:
+from robodk import robolink    # RoboDK API
+from robodk import robomath    # Robot toolbox
+RDK = robolink.Robolink()
+
+# Forward and backwards compatible use of the RoboDK API:
+# Remove these 2 lines to follow python programming guidelines
+from robodk import *      # RoboDK API
+from robolink import *    # Robot toolbox
+# Link to RoboDK
+# RDK = Robolink()
+
+# Any interaction with RoboDK must be done through RDK:
+RDK = Robolink()
+
+# get the robot by name:
+robot = RDK.Item('', ITEM_TYPE_ROBOT)
+while True:
+    xyz_coordinate = input("Enter xyz coordinates with no space:\n").split(',')
+    print(xyz_coordinate)
+    x = float(xyz_coordinate[0])
+    y = float(xyz_coordinate[1])
+    z = float(xyz_coordinate[2])
+    print(x)
+    print(y)
+    print(z)
+    pos1 = round(math.atan(y/x)*180/pi);
+    if x<0:
+        pos1 = round(math.atan(y/abs(x))*180/pi);
+        pos1 = 180 - pos1;
+    h = math.sqrt(x*x+y*y);
+    pos2 = 90 - (round(math.atan((z-198)/h)*180/pi));
+    robot.setJoints([pos1,pos2,0,0,0,0])      # set the robot movement's axes angle
+
