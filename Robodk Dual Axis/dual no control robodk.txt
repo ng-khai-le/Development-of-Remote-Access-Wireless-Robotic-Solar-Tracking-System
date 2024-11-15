@@ -1,0 +1,93 @@
+import time
+import datetime
+from openpyxl import *
+import serial
+port = 'COM6'
+board = serial.Serial(port, 9600, timeout=10)
+
+from robolink import *    # API to communicate with RoboDK
+from robodk import *      # robodk robotics toolbox
+# from robodk.robomath import *
+# Any interaction with RoboDK must be done through RDK:
+RDK = Robolink()
+
+# get the robot by name:
+robot = RDK.Item('', ITEM_TYPE_ROBOT)
+
+
+def retrieveData():
+    board.write(b'r')
+    while board.inWaiting():
+        pass
+    data = board.readline().decode('ascii')
+    return data
+
+
+board.write(b'0')  # send 0 to arduino to reset angle to 90
+time.sleep(1.1)
+
+buffer_pos_horizontal = -90 # home position in robodk
+buffer_pos_vertical = 0 # home position in robodk
+robot.setJoints([buffer_pos_horizontal,0,0,buffer_pos_vertical,0,0]) #reset the robot at robodk to home position
+row = 2
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Data"
+ws.append(['Time', 'Date', 'ini_pos_v', 'ini_pos_h', 'Fin_LDR1', 'Fin_LDR3', 'Fin_LDR2', 'Fin_LDR4', 'Vo_AADAT(V)',
+           'Vo_fixed(V)', 'Vin_AADAT(V)', 'Vin_fixed(V)', 'C_AADAT(mA)', 'C_fixed(mA)', 'P_AADAT(mW)', 'P_fixed(mW)'])
+while True:
+    # Update()
+    # pos_ref = robot.Pose()
+    # print(pos_ref)
+    # Joints(robot_item_list)
+    # joints = robot.Joints().list() 
+    # print(joints)
+    # SimulatorJoints()
+    # JointPoses(joints=None)
+    # JointsHome()
+    # setJointsHome(joints)
+    # getLink(type_linked=2)
+    data = retrieveData().strip('\r\n').split(',')
+    print(data)
+#######################################################
+    pos_vertical = int(data[0])
+    pos_horizontal = int(data[1])
+    robot_angle_vertical = pos_vertical - 90
+    robot_angle_horizontal = pos_horizontal - 180
+    robot.setJoints([robot_angle_horizontal,0,0,robot_angle_vertical,0,0])      # set the robot movement's axes angle
+    avgtop = int(data[2])
+    avgbot = int(data[3])
+    avgleft = int(data[4])
+    avgright = int(data[5])
+    Vo_AADAT = (float(data[6]))*5/1023
+    Vo_Fixed = (float(data[7]))*5/1023
+    C_AADAT = Vo_AADAT/12250
+    C_Fixed = Vo_Fixed/12250
+    Vin_AADAT = (C_AADAT*22750)+Vo_AADAT
+    Vin_Fixed = (C_Fixed*22750)+Vo_Fixed
+    P_AADAT = pow(Vin_AADAT, 2)/35000
+    P_Fixed = pow(Vin_Fixed, 2)/35000
+    ######################################################
+    now = datetime.datetime.now()
+    ws["A" + str(row)].value = now.strftime("%H:%M:%S")
+    ws["B" + str(row)].value = now.strftime("%d/%m/%y")
+    ws["C" + str(row)].value = pos_vertical
+    ws["D" + str(row)].value = pos_horizontal
+    ws["E" + str(row)].value = avgtop
+    ws["F" + str(row)].value = avgbot
+    ws["G" + str(row)].value = avgleft
+    ws["H" + str(row)].value = avgright
+    ws["I" + str(row)].value = Vo_AADAT
+    ws["J" + str(row)].value = Vo_Fixed
+    ws["K" + str(row)].value = Vin_AADAT
+    ws["L" + str(row)].value = Vin_Fixed
+    ws["M" + str(row)].value = C_AADAT*1000
+    ws["N" + str(row)].value = C_Fixed*1000
+    ws["O" + str(row)].value = P_AADAT*1000
+    ws["P" + str(row)].value = P_Fixed*1000
+    wb.save(r'C:/Users/nkhai/Desktop/AADAT_pyserial_Excel_NoControl(Middle_Separate).xlsx')
+    ###########################################################
+    row += 1
+    time.sleep(1.2)
+    # time.sleep(300)
